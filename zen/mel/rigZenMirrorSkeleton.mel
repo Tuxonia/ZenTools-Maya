@@ -1,0 +1,208 @@
+/* This file downloaded from Highend3d.com
+''  
+''  Highend3d.com File Information:
+''  
+''    Script Name: ZenTools
+''    Author:  
+''    Last Updated: Mar 27, 2009
+''    Update/Change this file at:
+''    http://Highend3d.com/maya/downloads/mel_scripts/modeling/curve_tools/4337.html
+''  
+''  Please do not alter any information above this line
+''  it is generated dynamically by Highend3d.com and will
+''  be changed automatically on any updates.
+*/
+//Mirrors a skeleton from the root joint.  
+//Joints to be mirrored are determined by side labels, or naming if side labels are absent.
+
+global proc rigZenMirrorSkeleton
+(	
+	int	$axis,
+	string	$root
+)
+{
+	float	$tol=.05;
+	
+	string	$axisString;
+	
+		if($axis==1) $axisString="YZ";
+		if($axis==2) $axisString="XZ";
+		if($axis==3) $axisString="YZ";	
+	
+	string	$joints[]=stringArrayRemoveDuplicates(zenReverseStringArray(`listRelatives -f -ad -type joint $root`));
+	string	$findString;
+	string	$replaceString;
+	string	$mirroredJoints[];
+	string	$jointToMirror[];
+	int	$side=-1;
+	string	$searchString;
+		
+		for($j in $joints)
+		{
+			if(!`stringArrayContains $j $mirroredJoints`)
+			{
+				if(objExists($j+".side")) $side	=`getAttr ($j+".side")`;
+				else $side=-1;
+			
+				if(`gmatch $j "*[Ll][Ee][Ff][Tt]*"` || $side==1)//joint is on left side
+				{
+					$findString="";
+					$replaceString="";
+									
+					$searchString="[Ll][Ee][Ff][Tt]";
+					$findString=match($searchString,$j);
+					
+					if(size($findString))
+					{						
+						if(`substring $findString 1 1`=="L") 
+							$replaceString="R";
+						else
+							$replaceString="r";
+
+						if(`substring $findString 2 2`=="E") 
+							$replaceString=$replaceString+"IGHT";
+						else
+							$replaceString=$replaceString+"ight";
+							
+						mirrorJoint(("-mirror"+$axisString),"-mirrorBehavior","-searchReplace",$findString,$replaceString,$j);
+					}
+					else										
+						mirrorJoint(("-mirror"+$axisString),"-mirrorBehavior",$j);
+					
+					$mirroredJoints=stringArrayCatenate($mirroredJoints,`listRelatives -f -ad -type joint $j`);
+				}
+				else
+				if(`gmatch $j "*[Rr][Ii][Gg][Hh][Tt]*"` || $side==2)//joint is on right side
+				{
+					$findString="";
+					$replaceString="";
+					
+					$searchString="[Rr][Ii][Gg][Hh][Tt]";
+					$findString=match($searchString,$j);
+
+					if(size($findString))
+					{
+						if(`substring $findString 1 1`=="R") 
+							$replaceString="L";
+						else
+							$replaceString="l";
+
+						if(`substring $findString 2 2`=="I") 
+							$replaceString=$replaceString+"EFT";
+						else
+							$replaceString=$replaceString+"eft";
+
+						mirrorJoint(("-mirror"+$axisString),"-mirrorBehavior","-searchReplace",$findString,$replaceString,$j);
+					}
+					else					
+						mirrorJoint(("-mirror"+$axisString),"-mirrorBehavior",$j);
+					
+					$mirroredJoints=stringArrayCatenate($mirroredJoints,`listRelatives -f -ad -type joint $j`);
+				}
+			}
+		}
+				
+	//change side attribute for mirrored joints & rename if they have non-unique names
+	string	$allJoints[]=`listRelatives -ad -type joint $root`;
+		$newJoints=`stringArrayRemove (ls("-sn",$joints)) $allJoints`;
+				
+	string	$shortName;
+	int	$side;
+	string	$cMuscleObjects[];
+	string	$opposites[]=`rigZenReturnOpposingTransforms $allJoints $root $axis $tol`;
+	string	$shapeNodes[];
+	string	$shortChildName;
+	string	$childTransforms[];
+	string	$childShapes[];
+		
+		for($i=0;$i<size($allJoints);$i++)
+		{
+			if(stringArrayContains($allJoints[$i],$newJoints))
+			{
+				//print $allJoints[$i];
+				
+				if(objExists($opposites[$i]+".side"))
+				{
+					$side=`getAttr ($opposites[$i]+".side")`;
+					if($side==1) setAttr ($allJoints[$i]+".side") 2;
+					if($side==2) setAttr ($allJoints[$i]+".side") 1;
+				}
+				
+				$shortName=zenReturnLastStringItem(`stringToStringArray $allJoints[$i] "|"`);
+				if(size(ls($shortName))>1) $allJoints[$i]=string(rename($allJoints[$i],`zenUniqueName $shortName`));
+				$shortName=zenReturnLastStringItem(`stringToStringArray $allJoints[$i] "|"`);
+				
+				$childNodes=`listRelatives -f -c $allJoints[$i]`;
+				$childShapes=`ls -l -type shape $childNodes`;
+				$childTransforms=`ls -l -type transform $childNodes`;
+				
+				for($c in $childTransforms)
+				{	
+					$shortChildName=zenReturnLastStringItem(stringToStringArray($c,"|"));
+					$shortChildName=`substitute ($searchString+"1") $shortChildName $replaceString`;
+					$shortChildName=`substitute $searchString $shortChildName $replaceString`;
+										
+					if($shortChildName!=zenReturnFirstStringItem(`ls -sn $c`))
+					{
+						$c=rename($c,$shortChildName);
+						$shortChildName=zenReturnLastStringItem(stringToStringArray($c,"|"));
+					}
+					if(size(ls($shortChildName))>1)
+						rename($c,`zenUniqueName $shortChildName`);
+					
+				}
+				for($c in $childShapes)
+				{
+					$shortChildName=zenReturnLastStringItem(stringToStringArray($c,"|"));
+					if(size(ls($shortChildName))>1)
+						$c=rename($c,`zenUniqueName $shortChildName`);     
+					$shortChildName=zenReturnLastStringItem(stringToStringArray($c,"|"));
+					if($shortChildName!=$shortName+"Shape")
+					{
+						$c=rename($c,$shortName+"Shape");
+						$shortChildName=zenReturnLastStringItem(stringToStringArray($c,"|"));
+					}
+					if(size(ls($shortChildName))>1)
+						rename($c,`zenUniqueName $shortChildName`);
+				}
+			}
+		}
+		
+		//re-check names in case any re-naming was necessary 
+		$allJoints=`listRelatives -f -ad -type joint $root`;
+		$newJoints=`stringArrayRemove $joints $allJoints`;
+		
+		//re-connect and flip muscles/capsules if present
+	string	$cMuscleTr;
+		$cMuscleObjects=`listRelatives -c -ad -type cMuscleObject $newJoints`;
+		if(size($cMuscleObjects)>0)              
+		{
+			for($c in $cMuscleObjects)
+			{
+				$cMuscleTr=zenReturnFirstStringItem(`listRelatives -p $c`);
+				
+				connectAttr ($cMuscleTr+".worldMatrix[0]") ($c+".worldMatrixStart");
+
+				if(`attributeExists "capsuleAxis" $c`)
+				{		
+					if(getAttr($c+".capsuleAxis")==0)
+						setAttr ($c+".capsuleAxis") 3;
+					else
+					if(getAttr($c+".capsuleAxis" )==1)
+						setAttr ($c+".capsuleAxis") 4;
+					else
+					if(getAttr($c+".capsuleAxis")==2)
+						setAttr ($c+".capsuleAxis") 5;
+					else
+					if(getAttr($c+".capsuleAxis")==3)
+						setAttr ($c+".capsuleAxis") 0;
+					else
+					if(getAttr($c+".capsuleAxis")==4)
+						setAttr ($c+".capsuleAxis") 1;
+					else
+					if(getAttr($c+".capsuleAxis")==5)
+						setAttr ($c+".capsuleAxis") 2;
+				}
+			}
+		}
+}

@@ -1,0 +1,238 @@
+/* This file downloaded from Highend3d.com
+''  
+''  Highend3d.com File Information:
+''  
+''    Script Name: ZenTools
+''    Author:  
+''    Last Updated: Mar 27, 2009
+''    Update/Change this file at:
+''    http://Highend3d.com/maya/downloads/mel_scripts/modeling/curve_tools/4337.html
+''  
+''  Please do not alter any information above this line
+''  it is generated dynamically by Highend3d.com and will
+''  be changed automatically on any updates.
+*/
+//creates a node network and returns an attribute signifying the weight of $poseB relative to $poseA, 
+//useful for driving corrective blends or muscle deformations
+
+global proc string[] rigZenPoseDrivenWeight(string $poseA, string $poseB)
+{
+	
+	float	$tol=.01;
+	
+	string	$root=zenReturnFirstStringItem(`dagPose -q -m $poseA`);
+	string	$startPose=`dagPose -s $root`;
+	
+	int	$sucess=rigZenGoToPose($poseA);
+		if(!$sucess) error -sl true "Could not achieve pose.";
+		
+	string	$joints[]=ls("-type","joint",`dagPose -q -ap $poseB`);
+	
+	int	$err;
+		$sucess=rigZenGoToPose($poseB);
+		if(!$sucess) error -sl true "Could not achieve pose.";
+				
+	//find which attributes on each joint differ from $poseA
+	
+	float	$jointTrXB[];
+	float	$jointTrYB[];
+	float	$jointTrZB[];
+	
+	float	$jointRotXB[];
+	float	$jointRotYB[];
+	float	$jointRotZB[];
+
+	float	$jointScaleXB[];
+	float	$jointScaleYB[];
+	float	$jointScaleZB[];
+	
+		for($i=0;$i<size($joints);$i++)
+		{
+			$jointTrXB[$i]=`getAttr ($joints[$i]+".tx")`;
+			$jointTrYB[$i]=`getAttr ($joints[$i]+".ty")`;
+			$jointTrZB[$i]=`getAttr ($joints[$i]+".tz")`;
+			
+			$jointRotXB[$i]=`getAttr ($joints[$i]+".rx")`;
+			$jointRotYB[$i]=`getAttr ($joints[$i]+".ry")`;
+			$jointRotZB[$i]=`getAttr ($joints[$i]+".rz")`;
+			
+			$jointScaleXB[$i]=`getAttr ($joints[$i]+".sx")`;
+			$jointScaleYB[$i]=`getAttr ($joints[$i]+".sy")`;
+			$jointScaleZB[$i]=`getAttr ($joints[$i]+".sz")`;
+		}
+		
+	int $sucess=rigZenGoToPose($poseA);
+		if(!$sucess) error -sl true "Could not achieve pose.";
+		
+	//set up a node network to return an average of the differential bias'
+	
+	string	$averageBias=`createNode plusMinusAverage`;
+	
+			setAttr ($averageBias+".operation") 3;
+	
+	string	$differenceNode;
+	string	$multiplyDivideNode;
+	string	$clampNode;
+
+	string	$attributes[];
+	
+	float	$bValues[];
+	
+	float	$val1;     
+	float	$val2;
+	float	$valA;
+	float	$valB;
+	float	$difference;
+	
+	int	$plug=0;
+	
+	string	$changedAttrs[];
+	
+	string	$multMatrixNode;
+	string	$decomposeMatrixNode;
+	string	$tempStringArray[];
+	string	$tempString;
+	string	$ja;
+	string	$cmd;
+	int	$offRot=false;
+	int	$offTr=false;
+	int	$offScale=false;
+	int	$sucess;
+	
+		for($i=0;$i<size($joints);$i++)
+		{			
+			$attributes={};
+			
+			$bValues={};
+			
+			$multMatrixNode="";
+			$decomposeMatrixNode="";
+			
+			$offRot=false;
+			$offTr=false;
+			$offScale=false;
+			if
+			(
+				abs(float($jointTrXB[$i]-(getAttr($joints[$i]+".tx"))))>$tol ||
+				abs(float($jointTrYB[$i]-(getAttr($joints[$i]+".ty"))))>$tol ||
+				abs(float($jointTrZB[$i]-(getAttr($joints[$i]+".tz"))))>$tol
+			)
+			{
+				$offTr=true;
+				$attributes=stringArrayCatenate($attributes,{"tx","ty","tz"});
+				$bValues=zenFloatArrayCatenate($bValues,{$jointTrXB[$i],$jointTrYB[$i],$jointTrZB[$i]});
+			}
+				
+			if
+			(
+				abs(float($jointRotXB[$i]-(getAttr($joints[$i]+".rx"))))>$tol ||
+				abs(float($jointRotYB[$i]-(getAttr($joints[$i]+".ry"))))>$tol ||
+				abs(float($jointRotZB[$i]-(getAttr($joints[$i]+".rz"))))>$tol
+			)
+			{
+				$offRot=true;
+				$attributes=stringArrayCatenate($attributes,{"rx","ry","rz"});
+				$bValues=zenFloatArrayCatenate($bValues,{$jointRotXB[$i],$jointRotYB[$i],$jointRotZB[$i]});
+			}
+				
+			if
+			(
+				abs(float($jointScaleXB[$i]-(getAttr($joints[$i]+".sx"))))>$tol ||
+				abs(float($jointScaleYB[$i]-(getAttr($joints[$i]+".sy"))))>$tol ||
+				abs(float($jointScaleZB[$i]-(getAttr($joints[$i]+".sz"))))>$tol
+			)
+			{
+				$offScale=true;
+				$attributes=stringArrayCatenate($attributes,{"sx","sy","sz"});
+				$bValues=zenFloatArrayCatenate($bValues,{$jointScaleXB[$i],$jointScaleYB[$i],$jointScaleZB[$i]});
+			}
+			//causes transformation measurements to be relative to original pose
+			if($offTr || $offRot || $offScale)
+			{
+				$multMatrixNode=`createNode multMatrix`;
+				$decomposeMatrixNode=`createNode decomposeMatrix`;
+				$cmd=
+				(
+					"setAttr -type \"matrix\""+
+					$multMatrixNode+".matrixIn[1]"+
+					(zenFloatArrayToString(`getAttr($joints[$i]+".inverseMatrix")`," "))
+				);
+				connectAttr -f ($joints[$i]+".matrix") ($multMatrixNode+".matrixIn[0]");
+				eval($cmd);
+				connectAttr -f ($multMatrixNode+".matrixSum") ($decomposeMatrixNode+".inputMatrix");
+			
+				for($n=0;$n<size($attributes);$n++)
+				{
+					$sucess=rigZenGoToPose($poseA);
+					if(!$sucess) error -sl true "Could not achieve pose.";
+					
+					$ja=($joints[$i]+"."+$attributes[$n]);
+					
+					$val1=`getAttr $ja`;
+					
+					$valA=`getAttr ($decomposeMatrixNode+".o"+$attributes[$n])`;
+					$err=true;	
+					
+					$sucess=rigZenGoToPose($poseB);
+					if(!$sucess) error -sl true "Could not achieve pose.";
+					
+					$valB=`getAttr ($decomposeMatrixNode+".o"+$attributes[$n])`;
+					$val2=`getAttr $ja`;
+									
+					if(abs(float($val1-$val2))>$tol)
+						$changedAttrs[size($changedAttrs)]=$ja;
+
+					if(abs(float($valA-$valB))>$tol)
+					{
+						$differenceNode=`createNode plusMinusAverage`;
+	
+							setAttr ($differenceNode+".operation") 2;
+	
+						if($valB>$valA)
+						{
+							connectAttr ($decomposeMatrixNode+".o"+$attributes[$n]) ($differenceNode+".i1[0]");
+							setAttr ($differenceNode+".i1[1]") $valA;				
+							$difference=$valB-$valA;
+						}
+						else
+						{
+							setAttr ($differenceNode+".i1[0]") $valA;
+							connectAttr ($decomposeMatrixNode+".o"+$attributes[$n]) ($differenceNode+".i1[1]");
+							$difference=$valA-$valB;
+						}
+						
+						$multiplyDivideNode=`createNode multiplyDivide`;
+						
+							setAttr ($multiplyDivideNode+".operation") 2;
+							setAttr ($multiplyDivideNode+".i2x") $difference;
+							
+							connectAttr ($differenceNode+".o1") ($multiplyDivideNode+".i1x");
+							
+						$clampNode=`createNode clamp`;
+						
+							setAttr ($clampNode+".mnr") 0;
+							setAttr ($clampNode+".mxr") 1;
+							
+							connectAttr ($multiplyDivideNode+".ox") ($clampNode+".ipr");
+							
+						connectAttr -f ($clampNode+".opr") ($averageBias+".i1["+(string($plug++))+"]");
+					}
+				}
+			}		
+		}
+		
+		$sucess=rigZenGoToPose($startPose);
+		if(!$sucess) error -sl true "Could not achieve pose.";
+		
+		delete $startPose;
+		
+	string	$rangeNode=`createNode -n "poseWeightNode#" setRange`;
+	
+			setAttr ($rangeNode+".maxX") 1;
+			setAttr ($rangeNode+".oldMaxX") 1;
+			aliasAttr "bias" ($rangeNode+".oldMinX");
+	
+		connectAttr -f ($averageBias+".o1") ($rangeNode+".valueX");
+				
+	return	(stringArrayCatenate({$rangeNode+".ox"},$changedAttrs));
+}

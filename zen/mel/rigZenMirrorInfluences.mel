@@ -1,0 +1,266 @@
+/* This file downloaded from Highend3d.com
+''  
+''  Highend3d.com File Information:
+''  
+''    Script Name: ZenTools
+''    Author:  
+''    Last Updated: Mar 27, 2009
+''    Update/Change this file at:
+''    http://Highend3d.com/maya/downloads/mel_scripts/modeling/curve_tools/4337.html
+''  
+''  Please do not alter any information above this line
+''  it is generated dynamically by Highend3d.com and will
+''  be changed automatically on any updates.
+*/
+//mirrors smooth skin influence weights, including non-joint influence objects
+global proc int rigZenMirrorInfluences( int $axis, int $positiveToNegative, float $tol, string $weightType )
+{
+		
+	int	$connect=false;
+		
+	float	$timer=`timerX`;
+
+	float	$weightTol=.001;
+
+	string	$sel[]=`ls -sl`;
+
+	//find skinCluster node
+	string	$skinClusterNode=$sel[0];
+	
+		if($weightType=="smoothSkin")
+		{
+			if(`nodeType $skinClusterNode`!="skinCluster")
+			{
+				$skinClusterNode=zenReturnFirstStringItem(`ls -type skinCluster (listHistory($skinClusterNode))`);
+			}
+		}
+		else
+		{
+			if(`nodeType $skinClusterNode`!="cMuscleSystem" && `pluginInfo -q -l MayaMuscle`)
+				$skinClusterNode=zenReturnFirstStringItem(`ls -type cMuscleSystem (listHistory($skinClusterNode))`);
+		}
+					
+		if(!objExists($skinClusterNode) || size($skinClusterNode)==0 )
+			error("No skin cluster or muscle system detected");
+					
+	string	$inputGeometry=zenReturnFirstStringItem(ls("-type","shape",(listHistory(listConnections($skinClusterNode+".input")))));
+	string	$outputGeometry=zenReturnFirstStringItem(ls("-type","shape",(`listHistory -future true ($skinClusterNode+".outputGeometry[0]")`)));
+									
+	//get an array of influences
+	
+	string	$influences[];
+	int	$lockSticky[];
+	int	$lockSliding[];
+	
+		if($weightType=="smoothSkin")
+			$influences=`listConnections -s 1 -d 0 ($skinClusterNode+".matrix")`;
+		else
+		{
+			$influences=`listConnections -sh 1 -s 1 -d 0 ($skinClusterNode+".muscleData")`;
+			for($i=0;$i<size($influences);$i++)
+			{
+				$lockSticky[$i]=`getAttr ($influences[$i]+".lockStickyWt")`;
+				setAttr($influences[$i]+".lockStickyWt",0);
+				$lockSliding[$i]=`getAttr($influences[$i]+".lockSlidingWt")`;
+				setAttr($influences[$i]+".lockSlidingWt",0);
+			}
+		}
+		
+	string	$root;
+	
+		if($weightType=="smoothSkin")
+			$root=$influences[0];
+		else
+			$root=zenReturnFirstStringItem(`rigZenFindRootJoints $influences`);
+		
+	float	$tempFloatArray[];
+	
+	string	$poseNode=`dagPose -s $root`;
+	
+		if(!size(`dagPose -q -bp $root`))
+			error "A bind pose is required for this operation.";
+
+	int	$opposites[];
+
+		$err=catch($opposites=rigZenFindOpposites($influences,$root,$axis,$tol));
+		
+	if($err)
+	{
+		if($weightType!="smoothSkin")
+		{
+			for($i=0;$i<size($influences);$i++)
+			{
+				if($lockSticky[$i])
+					setAttr($influences[$i]+".lockStickyWt",$lockSticky[$i]);
+				if($lockSliding[$i])
+					setAttr($influences[$i]+".lockSlidingWt",$lockSliding[$i]);
+			}
+		}
+		undoInfo -swf 1;
+	}
+//
+		
+	//find	opposing vertices
+
+	int	$intermediateObj=`getAttr ($inputGeometry+".intermediateObject")`;
+		
+		setAttr ($inputGeometry+".intermediateObject") 0;
+		
+	int	$undoInfoState=`undoInfo -q -swf`;
+
+	int	$opposingVerts[];       
+		
+		$err=catch($opposingVerts=zenVertexSymmetryNode(0,$axis,$inputGeometry,$root));
+	
+		if($err)
+		{
+			setAttr ($inputGeometry+".intermediateObject") $intermediateObj;
+			error("Error sorting reflecting vertices.");
+		}
+				
+	float	$weight;
+			
+	//set weights
+	
+		progressWindow -isInterruptable 1 -title "Working" -status "Setting Influence Weights" -max (size($opposingVerts)/2) -progress 0;
+	
+	int	$normalizeWeights;
+	
+		if($weightType=="smoothSkin")
+		{
+			$normalizeWeights=`getAttr ($skinClusterNode+".normalizeWeights")`;
+			setAttr ($skinClusterNode+".normalizeWeights") true;
+		}
+		else
+		{
+			$normalizeWeights=`getAttr ($skinClusterNode+".forceNormalize")`;
+		}		
+		
+	string	$vertInfluences[];
+	float	$vertInfluenceWeights[];
+
+	int	$influenceIndex;
+	int	$oppositeIndex;
+	
+	string	$oppositeInfluence;
+	string	$sourceConnection;
+	string	$targetConnection;
+	
+	int	$npSwitch=-1;
+	int	$norm=false;
+	
+		if($positiveToNegative) $npSwitch=1;
+		
+		for($i=0;$i<(size($opposingVerts));$i++)
+		{
+			if($opposingVerts[$i]*$npSwitch<0)
+			{
+				if($i!=abs($opposingVerts[$i]))
+				{
+					for($n=0;$n<(size($opposites));$n++)
+					{
+						if($weightType=="smoothSkin")
+						{
+							$sourceConnection=($skinClusterNode+".weightList["+(string($i))+"].weights["+(string($n))+"]");
+							$targetConnection=($skinClusterNode+".weightList["+(string(abs($opposingVerts[$i])))+"].weights["+(string($opposites[$n]))+"]");							$weight=`getAttr $sourceConnection`;
+							setAttr $targetConnection $weight;
+						}
+						else
+						{
+							if($weightType=="sticky" || $weightType=="stickyb" || $weightType=="stickyc")
+								$norm=false;
+							else
+								$norm=false;
+								
+							$weight=zenReturnFirstFloatItem
+							(
+								`cMuscleWeight 
+									-mi $n 
+									-pi $i 
+									-wt $weightType 
+									-system $skinClusterNode    
+									-q
+									-v`
+							);
+								
+							cMuscleWeight
+								-n $norm
+								-mi $opposites[$n]
+								-pi (abs($opposingVerts[$i]))  
+								-wt $weightType 
+								-system $skinClusterNode
+								-v $weight;
+						}
+					}
+				}	
+
+				if(`progressWindow -q -ic`)
+				{
+					setAttr ($inputGeometry+".intermediateObject") $intermediateObj;
+					if($weightType=="smoothSkin")
+					{
+						setAttr ($skinClusterNode+".normalizeWeights") $normalizeWeights;
+						skinPercent -nrm true $skinClusterNode (`polyListComponentConversion -tv $outputGeometry`);
+					}
+					else
+						setAttr ($skinClusterNode+".forceNormalize") $normalizeWeights;
+					progressWindow -ep;
+					undoInfo -swf 1;
+					if($weightType!="smoothSkin")
+					{
+						for($i=0;$i<size($influences);$i++)
+						{
+							if($lockSticky[$i])
+								setAttr($influences[$i]+".lockStickyWt",$lockSticky[$i]);
+							if($lockSliding[$i])
+								setAttr($influences[$i]+".lockSlidingWt",$lockSliding[$i]);
+						}
+					}
+					error "User Interupt.";
+				}
+
+				progressWindow -e -s 1;
+			}
+		}
+		
+		if($weightType!="smoothSkin")
+		{
+			for($i=0;$i<size($influences);$i++)
+			{
+				if($lockSticky[$i])
+					setAttr($influences[$i]+".lockStickyWt",$lockSticky[$i]);
+				if($lockSliding[$i])
+					setAttr($influences[$i]+".lockSlidingWt",$lockSliding[$i]);
+			}
+		}
+			
+		progressWindow -ep;
+						
+		if($weightType=="smoothSkin")
+		{
+			setAttr ($skinClusterNode+".normalizeWeights") $normalizeWeights;
+			skinPercent -nrm true $skinClusterNode (polyListComponentConversion("-tv",$outputGeometry));
+		}
+		else
+		{
+			setAttr ($skinClusterNode+".forceNormalize") $normalizeWeights;
+			for($i=0;$i<size($influences);$i++)
+			{
+				if($lockSticky[$i])
+					setAttr($influences[$i]+".lockStickyWt",$lockSticky[$i]);
+				if($lockSliding[$i])
+					setAttr($influences[$i]+".lockSlidingWt",$lockSliding[$i]);
+			}
+		}
+				
+		setAttr ($inputGeometry+".intermediateObject") $intermediateObj;
+		
+		rigZenGoToPose($poseNode);
+		delete $poseNode;
+		
+		//print("Operation took "+`timerX -st $timer`+" seconds.");
+				
+	return	1;
+}
+
+

@@ -1,0 +1,188 @@
+/* This file downloaded from Highend3d.com
+''  
+''  Highend3d.com File Information:
+''  
+''    Script Name: ZenTools
+''    Author:  
+''    Last Updated: Mar 27, 2009
+''    Update/Change this file at:
+''    http://Highend3d.com/maya/downloads/mel_scripts/modeling/curve_tools/4337.html
+''  
+''  Please do not alter any information above this line
+''  it is generated dynamically by Highend3d.com and will
+''  be changed automatically on any updates.
+*/
+global proc layoutZenMirrorInfluences()
+{
+	global 	string 	$zenToolsWindow;
+	global 	int	$zenMinimumWindowWidth;
+	
+	global	int	$zenOptions_mirrorInfluencesAxis,
+			$zenOptions_mirrorInfluencesPosNeg;
+	global	float	$zenOptions_tol;
+	global	string	$zenOptionString_mirrorWeightType;
+	
+	string	$weightTypes[]=              
+		{
+			"smoothSkin",
+			"sticky",
+			"stickyb",
+			"stickyc",
+			"sliding",
+			"direction",
+			"smartregiona",
+			"smartregionb",
+			"smartbulk",
+			"smartbulkangular",
+			"smartbulkwiden",
+			"smartslide",
+			"smartslideangular",
+			"smartsmooth",
+			"smartwrinkle",
+			"smartflatten",
+			"smartvolumize",
+			"force",
+			"jiggle",
+			"cycle",
+			"rest",
+			"relax",
+			"wrinkle",
+			"smooth",
+			"smoothcompress",
+			"smoothexpand",
+			"selfcollision",
+			"selfrigidity",
+			"selfVolumize"
+		};
+	
+		window -e -title "ZenTools : Mirror Skin Influences" $zenToolsWindow;
+
+	string	$mainColumn=`zenClearToolColumn`;
+
+		text -al left -p $mainColumn -label "Mirror Axis:";
+
+		radioButtonGrp
+			-numberOfRadioButtons 3
+			-l1 "x"
+			-l2 "y"
+			-l3 "z"
+			-select $zenOptions_mirrorInfluencesAxis
+			-cc "$zenOptions_mirrorInfluencesAxis=int(`radioButtonGrp -q -sl zenOptions_mirrorInfluencesAxis`)"
+			-columnWidth3 ($zenMinimumWindowWidth/3) ($zenMinimumWindowWidth/3) ($zenMinimumWindowWidth/3)
+			zenOptions_mirrorInfluencesAxis;
+			
+		checkBox
+			-v $zenOptions_mirrorInfluencesPosNeg
+			-cc "$zenOptions_mirrorInfluencesPosNeg=`checkBox -q -v zenOptions_mirrorInfluencesPosNeg`"
+			-al left
+			-label "Positive To Negative"
+			zenOptions_mirrorInfluencesPosNeg;
+
+		separator -p $mainColumn -w $zenMinimumWindowWidth;
+
+		text -al left -l "Tolerance:";
+
+		floatField 
+			-v $zenOptions_tol 
+			-cc "$zenOptions_tol=`floatField -q -v zenOptions_tol`"
+			zenOptions_tol;
+			
+		separator -p $mainColumn -w $zenMinimumWindowWidth;
+		
+	string	$muscleSystems[];
+	
+		if(`pluginInfo -q -l MayaMuscle`)
+			$muscleSystems=`ls -type "cMuscleSystem"`;
+			
+		if(size($muscleSystems)>0)
+		{
+			optionMenuGrp
+				-l "Weight Type:"
+				-adj 2
+				-cw 1 80
+				-cal 1 "right"
+				-cc
+				(
+					"string $zenOptions_tempStringArray[]=`optionMenuGrp -q -ill zenOptionString_mirrorWeightType`;\n"+
+					"int $zenOptions_tempInteger=`optionMenuGrp -q -sl zenOptionString_mirrorWeightType`;\n"+
+					"eval( menuItem(\"-q\",\"-c\",$zenOptions_tempStringArray[$zenOptions_tempInteger-1]));\n"
+				)
+				zenOptionString_mirrorWeightType;
+								
+				menuItem -l "Smooth Skin" -c "$zenOptionString_mirrorWeightType=\"smoothSkin\"";
+				menuItem -l "cMuscle: Sticky" -c "$zenOptionString_mirrorWeightType=\"sticky\"";
+				menuItem -l "cMuscle: Sticky B" -c "$zenOptionString_mirrorWeightType=\"stickyb\"";
+				menuItem -l "cMuscle: Sticky C" -c "$zenOptionString_mirrorWeightType=\"stickyc\"";
+				menuItem -l "cMuscle: Sliding" -c "$zenOptionString_mirrorWeightType=\"sliding\"";
+				menuItem -l "cMuscle: Direction" -c "$zenOptionString_mirrorWeightType=\"direction\"";
+				menuItem -l "cMuscle: Smart Region A" -c "$zenOptionString_mirrorWeightType=\"smartregiona\"";
+				menuItem -l "cMuscle: Smart Region B" -c "$zenOptionString_mirrorWeightType=\"smartregionb\"";
+				menuItem -l "cMuscle: Smart Bulk" -c "$zenOptionString_mirrorWeightType=\"smartbulk\"";
+				menuItem -l "cMuscle: Smart Bulk Angular" -c "$zenOptionString_mirrorWeightType=\"smartbulkangular\"";
+				menuItem -l "cMuscle: Smart Bulk Widen" -c "$zenOptionString_mirrorWeightType=\"smartbulkwiden\"";
+				menuItem -l "cMuscle: Smart Slide" -c "$zenOptionString_mirrorWeightType=\"smartslide\"";
+				menuItem -l "cMuscle: Smart Slide Angular" -c "$zenOptionString_mirrorWeightType=\"smartslideangular\"";
+				menuItem -l "cMuscle: Smart Smooth" -c "$zenOptionString_mirrorWeightType=\"smartsmooth\"";
+				menuItem -l "cMuscle: Smart Wrinkle" -c "$zenOptionString_mirrorWeightType=\"smartwrinkle\"";
+				menuItem -l "cMuscle: Smart Flatten" -c "$zenOptionString_mirrorWeightType=\"smartflatten\"";
+				menuItem -l "cMuscle: Smart Volumize" -c "$zenOptionString_mirrorWeightType=\"smartvolumize\"";
+				menuItem -l "cMuscle: Force" -c "$zenOptionString_mirrorWeightType=\"force\"";
+				menuItem -l "cMuscle: Jiggle" -c "$zenOptionString_mirrorWeightType=\"jiggle\"";
+				menuItem -l "cMuscle: Cycle" -c "$zenOptionString_mirrorWeightType=\"cycle\"";
+				menuItem -l "cMuscle: Rest" -c "$zenOptionString_mirrorWeightType=\"rest\"";
+				menuItem -l "cMuscle: Relax" -c "$zenOptionString_mirrorWeightType=\"relax\"";
+				menuItem -l "cMuscle: Wrinkle" -c "$zenOptionString_mirrorWeightType=\"wrinkle\"";
+				menuItem -l "cMuscle: Smooth" -c "$zenOptionString_mirrorWeightType=\"smooth\"";
+				menuItem -l "cMuscle: Smooth Compress" -c "$zenOptionString_mirrorWeightType=\"smoothcompress\"";
+				menuItem -l "cMuscle: Smooth Expand" -c "$zenOptionString_mirrorWeightType=\"smoothexpand\"";
+				menuItem -l "cMuscle: Self Collision" -c "$zenOptionString_mirrorWeightType=\"selfcollision\"";
+				menuItem -l "cMuscle: Self Rigidity" -c "$zenOptionString_mirrorWeightType=\"selfrigidity\"";
+				menuItem -l "cMuscle: Self Volumize" -c "$zenOptionString_mirrorWeightType=\"selfVolumize\"";
+				
+			optionMenuGrp
+				-e
+				-select (zenFirstIndexOfStringInArray($zenOptionString_mirrorWeightType,$weightTypes)+1)
+				zenOptionString_mirrorWeightType;
+		}
+		else
+		{
+			$zenOptionString_mirrorWeightType="smoothSkin";
+		}
+
+		separator -p $mainColumn;
+		
+	string	$cMuscleSystems[];
+		if(`pluginInfo -q -l MayaMuscle`)
+			$cMuscleSystems=`ls -type cMuscleSystem`;
+	int	$noBind=false;
+	string	$influences[];               
+	string	$influenceTransforms[];
+	
+		 for($m in $cMuscleSystems)
+		 {
+			$influences=`listConnections -sh 1 -s 1 -d 0 ($m+".muscleData")`;
+			$influenceTransforms=`listRelatives -p $influences`;
+			
+			 if(!size(`dagPose -q -bp $influenceTransforms`))
+				$noBind=true; 
+		 }
+		
+	string 	$setBindPose;
+	
+		if($noBind)
+		{
+			$setBindPose=`button -p $mainColumn -w 138 -label "Set Bind Pose"`;
+			button
+				-e 
+				-w $zenMinimumWindowWidth
+				-command "doZenCommand doZenSetMuscleSystemBindPose;layoutZenMirrorInfluences;"
+				$setBindPose;
+		}
+
+	string 	$mirror=`button -p $mainColumn -w 138 -label "Mirror Influences"`;
+		button 	
+			-e 
+			-w $zenMinimumWindowWidth
+			-command "doZenCommand doZenMirrorInfluences" 
+			$mirror;
+}

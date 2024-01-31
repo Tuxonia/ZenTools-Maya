@@ -1,0 +1,55 @@
+/* This file downloaded from Highend3d.com
+''  
+''  Highend3d.com File Information:
+''  
+''    Script Name: ZenTools
+''    Author:  
+''    Last Updated: Mar 27, 2009
+''    Update/Change this file at:
+''    http://Highend3d.com/maya/downloads/mel_scripts/modeling/curve_tools/4337.html
+''  
+''  Please do not alter any information above this line
+''  it is generated dynamically by Highend3d.com and will
+''  be changed automatically on any updates.
+*/
+//return an edge ring in order of $edges[0] to $edges[1]
+global proc string[] zenOrderedEdgeRingPath(string $edges[])
+{
+	string	$sel[]=`ls -sl`;
+	string 	$obj=zenReturnFirstStringItem(`stringToStringArray $edges[0] "."`);
+	int	$edgeA=`zenCompID ($edges[0])`;
+	int	$edgeB;
+	int	$edgeIndices[];
+	string 	$returnVal[];
+	
+		if(size($edges)>1)
+		{
+			$edgeB=`zenCompID ($edges[1])`;
+			$edgeIndices=`polySelect -ns -erp $edgeA $edgeB $obj`;
+			if(!size($edgeIndices))	$edgeIndices=zenReverseIntArray(`polySelect -ns -erp $edgeB $edgeA $obj`);
+		}
+		else
+		{
+			$edgeIndices=`polySelect -ns -er $edgeA $obj`;
+		}
+		
+		if($edgeA!=$edgeIndices[0])
+			$edgeIndices=`zenReverseIntArray $edgeIndices`;
+		
+		$returnVal=`zenCompFromID $obj e $edgeIndices`;
+		
+		if($edgeA!=$edgeIndices[0])
+		{
+			if(size($edges)>1)
+			{
+				evalDeferred("select("+zenReturnStringArrayFormat(stringArrayCatenate($returnVal,$edges))+")");
+				error -sl true "Invalid selection.\n";
+			}
+			else
+			{
+				return $returnVal;
+			}
+		}
+				
+	return 	$returnVal;
+}

@@ -1,0 +1,90 @@
+/* This file downloaded from Highend3d.com
+''  
+''  Highend3d.com File Information:
+''  
+''    Script Name: ZenTools
+''    Author:  
+''    Last Updated: Mar 27, 2009
+''    Update/Change this file at:
+''    http://Highend3d.com/maya/downloads/mel_scripts/modeling/curve_tools/4337.html
+''  
+''  Please do not alter any information above this line
+''  it is generated dynamically by Highend3d.com and will
+''  be changed automatically on any updates.
+*/
+global proc string[] rigZenReturnOpposingTransforms( string $tr[], string $root, int $axis,float $tol)
+{
+		if($axis<1) error -sl 1 "Error, no axis input.";
+	
+		$tr=`ls $tr`;
+		
+	string	$returnVal[];
+	string	$conn[];
+	int	$allFound=true;
+	string	$tempString;
+		
+		if(size(`ls -tr $tr`)!=size($tr)) error("-sl",true,"All items must be transforms.");
+		
+		for($i=0;$i<size($tr);$i++)
+		{
+			if(size(`ls $tr[$i]`)>1)
+			{
+				$tempString=zenReturnFirstStringItem(`ls -l $tr[$i]`);
+				$tr[$i]=rename($tempString,zenUniqueObjectName($tr[$i]));
+			}
+			if(objExists($tr[$i]+".zenOpposite"))
+			{
+				$conn=`listConnections -s 1 -d 0 ($tr[$i]+".zenOpposite")`;
+				if(size($conn)) 
+					$returnVal[$i]=$conn[0];
+				else 
+					$allFound=false;
+			}
+			else
+				$allFound=false;
+		}
+		
+		if($allFound) return $returnVal;
+		
+	string	$candidates[]=listRelatives("-ad","-type","transform",$root);
+		$candidates=stringArrayRemove(ls("-type","constraint",$candidates),$candidates);
+		$candidates=stringArrayCatenate({$root},`stringArrayRemoveDuplicates $candidates`);
+		
+	int	$oppositeIDs[]=rigZenFindOpposites($candidates,$root,$axis,$tol);
+		
+	int	$id;
+	
+		for($i=0;$i<size($tr);$i++)
+		{
+			if(!size($returnVal[$i]))
+			{
+				$id=zenFirstIndexOfStringInArray($tr[$i],$candidates);
+				
+				if($id<0)
+				{
+					$id=zenFirstIndexOfStringInArray(zenReturnFirstStringItem(`ls -sn $tr[$i]`),$candidates);
+					if($id<0)
+					{
+						$id=zenFirstIndexOfStringInArray(zenReturnFirstStringItem(`ls -l $tr[$i]`),$candidates);
+						if($id<0)
+							error -sl 1 ("Error finding a mirror for "+$tr[$i]+".\n");
+					}
+				}
+				
+				$returnVal[$i]=$candidates[$oppositeIDs[$id]];
+				
+				//speed up future operations
+				if(!objExists($tr[$i]+".zenOpposite"))
+					addAttr -at message -ln "zenOpposite" -sn "zo" -h true $tr[$i];
+				if(!objExists($returnVal[$i]+".zenOpposite"))
+					addAttr -at message -ln "zenOpposite" -sn "zo" -h true $returnVal[$i];
+				
+				if(!`isConnected ($returnVal[$i]+".message") ($tr[$i]+".zenOpposite")`)
+					connectAttr -f ($returnVal[$i]+".message") ($tr[$i]+".zenOpposite");
+				if(!`isConnected ($tr[$i]+".message") ($returnVal[$i]+".zenOpposite")`)
+					connectAttr -f ($tr[$i]+".message") ($returnVal[$i]+".zenOpposite");
+			}
+		}
+		
+	return	$returnVal;
+}

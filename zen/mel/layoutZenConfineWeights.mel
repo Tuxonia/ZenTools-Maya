@@ -1,0 +1,139 @@
+/* This file downloaded from Highend3d.com
+''  
+''  Highend3d.com File Information:
+''  
+''    Script Name: ZenTools
+''    Author:  
+''    Last Updated: Mar 27, 2009
+''    Update/Change this file at:
+''    http://Highend3d.com/maya/downloads/mel_scripts/modeling/curve_tools/4337.html
+''  
+''  Please do not alter any information above this line
+''  it is generated dynamically by Highend3d.com and will
+''  be changed automatically on any updates.
+*/
+
+global proc string layoutZenConfineWeights()
+{
+	global 	int 	$zenMinimumWindowWidth;
+	global 	string	$zenToolsWindow;
+
+	global 	int	$zenOptions_confineWeightsHierarchy;
+	global	string	$zenOptionString_weightType;
+	
+	string	$weightTypes[]=                   
+		{
+			"smoothSkin",
+			"sticky",
+			"stickyb",
+			"stickyc",
+			"sliding",
+			"direction",
+			"smartregiona",
+			"smartregionb",
+			"smartbulk",
+			"smartbulkangular",
+			"smartbulkwiden",
+			"smartslide",
+			"smartslideangular",
+			"smartsmooth",
+			"smartwrinkle",
+			"smartflatten",
+			"smartvolumize",
+			"force",
+			"jiggle",
+			"cycle",
+			"rest",
+			"relax",
+			"wrinkle",
+			"smooth",
+			"smoothcompress",
+			"smoothexpand",
+			"selfcollision",
+			"selfrigidity",
+			"selfVolumize"
+		};
+	
+	string 	$parentLayout=`zenClearToolColumn`;
+	
+	string	$column=`columnLayout -adj 1 -p $parentLayout`;
+		
+		window -e -w $zenMinimumWindowWidth -title "ZenTools : Confine Weights" $zenToolsWindow;
+
+		checkBox
+			-p $column
+			-al left
+			-l "Include Hierarchy"
+			-v $zenOptions_confineWeightsHierarchy
+			-cc "$zenOptions_confineWeightsHierarchy=`checkBox -q -v zenOptions_confineWeightsHierarchy`"
+			zenOptions_confineWeightsHierarchy;
+			
+	string	$muscleSystems[];
+	
+		if(`pluginInfo -q -l MayaMuscle`)
+			$muscleSystems=`ls -type "cMuscleSystem"`;
+		
+		if(size($muscleSystems)>0)
+		{
+			optionMenuGrp
+				-l "Weight Type:"
+				-adj 2
+				-cw 1 80
+				-cal 1 "right"
+				-cc
+				(
+					"string $zenOptions_tempStringArray[]=`optionMenuGrp -q -ill zenOptionString_weightType`;\n"+
+					"int $zenOptions_tempInteger=`optionMenuGrp -q -sl zenOptionString_weightType`;\n"+
+					"eval( menuItem(\"-q\",\"-c\",$zenOptions_tempStringArray[$zenOptions_tempInteger-1]));\n"
+				)
+				zenOptionString_weightType;
+								
+				menuItem -l "Smooth Skin" -c "$zenOptionString_weightType=\"smoothSkin\"";
+				menuItem -l "cMuscle: Sticky" -c "$zenOptionString_weightType=\"sticky\"";
+				menuItem -l "cMuscle: Sticky B" -c "$zenOptionString_weightType=\"stickyb\"";
+				menuItem -l "cMuscle: Sticky C" -c "$zenOptionString_weightType=\"stickyc\"";
+				menuItem -l "cMuscle: Sliding" -c "$zenOptionString_weightType=\"sliding\"";
+				menuItem -l "cMuscle: Direction" -c "$zenOptionString_weightType=\"direction\"";
+				menuItem -l "cMuscle: Smart Region A" -c "$zenOptionString_weightType=\"smartregiona\"";
+				menuItem -l "cMuscle: Smart Region B" -c "$zenOptionString_weightType=\"smartregionb\"";
+				menuItem -l "cMuscle: Smart Bulk" -c "$zenOptionString_weightType=\"smartbulk\"";
+				menuItem -l "cMuscle: Smart Bulk Angular" -c "$zenOptionString_weightType=\"smartbulkangular\"";
+				menuItem -l "cMuscle: Smart Bulk Widen" -c "$zenOptionString_weightType=\"smartbulkwiden\"";
+				menuItem -l "cMuscle: Smart Slide" -c "$zenOptionString_weightType=\"smartslide\"";
+				menuItem -l "cMuscle: Smart Slide Angular" -c "$zenOptionString_weightType=\"smartslideangular\"";
+				menuItem -l "cMuscle: Smart Smooth" -c "$zenOptionString_weightType=\"smartsmooth\"";
+				menuItem -l "cMuscle: Smart Wrinkle" -c "$zenOptionString_weightType=\"smartwrinkle\"";
+				menuItem -l "cMuscle: Smart Flatten" -c "$zenOptionString_weightType=\"smartflatten\"";
+				menuItem -l "cMuscle: Smart Volumize" -c "$zenOptionString_weightType=\"smartvolumize\"";
+				menuItem -l "cMuscle: Force" -c "$zenOptionString_weightType=\"force\"";
+				menuItem -l "cMuscle: Jiggle" -c "$zenOptionString_weightType=\"jiggle\"";
+				menuItem -l "cMuscle: Cycle" -c "$zenOptionString_weightType=\"cycle\"";
+				menuItem -l "cMuscle: Rest" -c "$zenOptionString_weightType=\"rest\"";
+				menuItem -l "cMuscle: Relax" -c "$zenOptionString_weightType=\"relax\"";
+				menuItem -l "cMuscle: Wrinkle" -c "$zenOptionString_weightType=\"wrinkle\"";
+				menuItem -l "cMuscle: Smooth" -c "$zenOptionString_weightType=\"smooth\"";
+				menuItem -l "cMuscle: Smooth Compress" -c "$zenOptionString_weightType=\"smoothcompress\"";
+				menuItem -l "cMuscle: Smooth Expand" -c "$zenOptionString_weightType=\"smoothexpand\"";
+				menuItem -l "cMuscle: Self Collision" -c "$zenOptionString_weightType=\"selfcollision\"";
+				menuItem -l "cMuscle: Self Rigidity" -c "$zenOptionString_weightType=\"selfrigidity\"";
+				menuItem -l "cMuscle: Self Volumize" -c "$zenOptionString_weightType=\"selfVolumize\"";
+				
+			optionMenuGrp
+				-e
+				-select (zenFirstIndexOfStringInArray($zenOptionString_weightType,$weightTypes)+1)
+				zenOptionString_weightType;
+		}
+		else
+		{
+			$zenOptionString_weightType="smoothSkin";
+		}
+
+		separator -p $column -w $zenMinimumWindowWidth;
+
+		button
+			-p $column
+			-label Apply
+			-command "doZenCommand doZenConfineWeights";
+				
+	return	$column;
+}

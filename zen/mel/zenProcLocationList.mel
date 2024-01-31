@@ -1,0 +1,58 @@
+/* This file downloaded from Highend3d.com
+''  
+''  Highend3d.com File Information:
+''  
+''    Script Name: ZenTools
+''    Author:  
+''    Last Updated: Mar 27, 2009
+''    Update/Change this file at:
+''    http://Highend3d.com/maya/downloads/mel_scripts/modeling/curve_tools/4337.html
+''  
+''  Please do not alter any information above this line
+''  it is generated dynamically by Highend3d.com and will
+''  be changed automatically on any updates.
+*/
+//////////////////////////////////////////////////////////////////////////////////////////////////////
+//find the location of a procedure
+//////////////////////////////////////////////////////////////////////////////////////////////////////
+
+global proc string[] zenProcLocationList(string $procName)
+{
+		rehash;
+
+	//find the correct separator for the OS
+	string 	$sep;
+
+		if(`about -os`=="nt" || `about -os`=="win64")
+			$sep=";";
+		else
+			$sep=":";
+
+	//look in the path for the procedure
+	string	$results[];
+	string 	$location;
+	string 	$path[]=stringToStringArray(`getenv MAYA_SCRIPT_PATH`,$sep);
+	int	$id=0;
+
+		for($p in $path)
+		{
+		    $location=searchPathArray(($procName+".mel"),{$p});
+		    $location=substitute("//",$location,"/");
+		    if(size($location))
+			$results[$id++]=$location;
+		}
+
+	//see where it was sourced from
+	string	$verbose=`whatIs ($procName)`;
+	string	$verboseArray[]=`stringToStringArray $verbose ":"`;
+		$verboseArray=`stringArrayRemove {$verboseArray[0]} $verboseArray`;
+		$location=`stringArrayToString $verboseArray ":"`;
+		$location=`strip $location`;
+
+		if(size($location))
+			$results[$id++]=$location;
+
+		$results=`stringArrayRemoveDuplicates $results`;
+
+	return	$results;
+}

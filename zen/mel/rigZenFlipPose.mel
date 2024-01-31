@@ -1,0 +1,133 @@
+/* This file downloaded from Highend3d.com
+''  
+''  Highend3d.com File Information:
+''  
+''    Script Name: ZenTools
+''    Author:  
+''    Last Updated: Mar 27, 2009
+''    Update/Change this file at:
+''    http://Highend3d.com/maya/downloads/mel_scripts/modeling/curve_tools/4337.html
+''  
+''  Please do not alter any information above this line
+''  it is generated dynamically by Highend3d.com and will
+''  be changed automatically on any updates.
+*/
+global proc int rigZenFlipPose(int $axis, string $symmetryPose)
+{
+	float	$tol=.05;
+	int	$err;
+	
+	string	$root=zenReturnFirstStringItem(`dagPose -q -m $symmetryPose`);
+	
+	//this point matrix multiplier offsets the calculations to correspond with the root joint
+
+	string	$pointMatrixMultNode=`createNode pointMatrixMult`;
+	string	$pointMatrixMultNode2=`createNode pointMatrixMult`;
+	
+	string	$localSpaceObj=`createNode transform`;
+	
+	float	$tempFloatArray[]=`xform -q -ws -t $root`;
+		xform -ws -t $tempFloatArray[0] $tempFloatArray[1] $tempFloatArray[2] $localSpaceObj;
+		
+		connectAttr ($localSpaceObj+".worldInverseMatrix[0]") ($pointMatrixMultNode+".inMatrix");
+		disconnectAttr ($localSpaceObj+".worldInverseMatrix[0]") ($pointMatrixMultNode+".inMatrix");
+		
+		connectAttr ($localSpaceObj+".worldMatrix[0]") ($pointMatrixMultNode2+".inMatrix");
+		disconnectAttr ($localSpaceObj+".worldMatrix[0]") ($pointMatrixMultNode2+".inMatrix");
+		
+		delete $localSpaceObj;
+			
+		setAttr ($pointMatrixMultNode+".vectorMultiply") 1;
+	
+	string	$moved[]=`dagPose -q -ap $symmetryPose`;
+	
+	float	$tempFloatArray[];
+	float	$jointTrX[];
+	float	$jointTrY[];
+	float	$jointTrZ[];
+	
+	float	$jointRotX[];
+	float	$jointRotY[];
+	float	$jointRotZ[];
+	
+	float	$jointScaleX[];
+	float	$jointScaleY[];
+	float	$jointScaleZ[];
+	
+	float	$tryDiff[];
+	
+		for($i=0;$i<size($moved);$i++)
+		{
+			$tempFloatArray=`xform -q -ws -t $moved[$i]`;
+			setAttr ($pointMatrixMultNode+".inPoint") $tempFloatArray[0] $tempFloatArray[1] $tempFloatArray[2];
+			$tempFloatArray =`getAttr ($pointMatrixMultNode+".output")`;
+			$jointTrX[$i]=$tempFloatArray[0];
+			$jointTrY[$i]=$tempFloatArray[1];
+			$jointTrZ[$i]=$tempFloatArray[2];
+			
+			$jointRotX[$i]=`getAttr ($moved[$i]+".rx")`;
+			$jointRotY[$i]=`getAttr ($moved[$i]+".ry")`;
+			$jointRotZ[$i]=`getAttr ($moved[$i]+".rz")`;
+			
+			$jointScaleX[$i]=`getAttr ($moved[$i]+".sx")`;
+			$jointScaleY[$i]=`getAttr ($moved[$i]+".sy")`;
+			$jointScaleZ[$i]=`getAttr ($moved[$i]+".sz")`;
+		}
+		
+	int	$err;
+	int	$sucess=rigZenGoToPose($symmetryPose);
+		if(!$sucess) error -sl true "Could not achieve pose.";
+		
+	string	$oppositeJoint[];
+		
+		$oppositeJoint=`rigZenReturnOpposingTransforms $moved $root $axis $tol`;
+		
+		for($i=0;$i<size($moved);$i++)
+		{
+			if($moved[$i]==$oppositeJoint[$i])
+			{
+				switch($axis)
+				{
+					case 1:
+						setAttr ($pointMatrixMultNode+".inPoint") (-$jointTrX[$i]) ($jointTrY[$i]) ($jointTrZ[$i]);	
+						catchQuiet(`xform -ro (-$jointRotX[$i]) (-$jointRotY[$i]) ($jointRotZ[$i]) $oppositeJoint[$i]`);
+						break;
+					case 2:
+						setAttr ($pointMatrixMultNode+".inPoint") ($jointTrX[$i]) (-$jointTrY[$i]) ($jointTrZ[$i]);
+						catchQuiet(`xform -ro ($jointRotX[$i]) (-$jointRotY[$i]) (-$jointRotZ[$i]) $oppositeJoint[$i]`);
+						break;
+					case 3:
+						setAttr ($pointMatrixMultNode+".inPoint") ($jointTrX[$i]) ($jointTrY[$i]) (-$jointTrZ[$i]);
+						catchQuiet(`xform -ro (-$jointRotX[$i]) ($jointRotY[$i]) (-$jointRotZ[$i]) $oppositeJoint[$i]`);
+						break;
+				}
+			}
+			else
+			{
+				switch($axis)
+				{
+					case 1:
+						setAttr ($pointMatrixMultNode+".inPoint") (-$jointTrX[$i]) ($jointTrY[$i]) ($jointTrZ[$i]);	
+						break;
+					case 2:
+						setAttr ($pointMatrixMultNode+".inPoint") ($jointTrX[$i]) (-$jointTrY[$i]) ($jointTrZ[$i]);
+						break;
+					case 3:
+						setAttr ($pointMatrixMultNode+".inPoint") ($jointTrX[$i]) ($jointTrY[$i]) (-$jointTrZ[$i]);
+						break;
+				}
+				catchQuiet(`xform -ro $jointRotX[$i] $jointRotY[$i] $jointRotZ[$i] $oppositeJoint[$i]`);
+			}
+			
+			$tempFloatArray =`getAttr ($pointMatrixMultNode+".output")`;
+			catchQuiet(`xform -ws -t $tempFloatArray[0] $tempFloatArray[1] $tempFloatArray[2] $oppositeJoint[$i]`);
+			
+			catchQuiet(`setAttr ($oppositeJoint[$i]+".sx") ($jointScaleX[$i])`);
+			catchQuiet(`setAttr ($oppositeJoint[$i]+".sy") ($jointScaleY[$i])`);
+			catchQuiet(`setAttr ($oppositeJoint[$i]+".sz") ($jointScaleZ[$i])`);
+		}
+		
+		delete $pointMatrixMultNode;
+		
+	return	1;
+}

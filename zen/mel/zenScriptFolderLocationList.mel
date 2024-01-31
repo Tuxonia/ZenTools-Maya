@@ -1,0 +1,64 @@
+/* This file downloaded from Highend3d.com
+''  
+''  Highend3d.com File Information:
+''  
+''    Script Name: ZenTools
+''    Author:  
+''    Last Updated: Mar 27, 2009
+''    Update/Change this file at:
+''    http://Highend3d.com/maya/downloads/mel_scripts/modeling/curve_tools/4337.html
+''  
+''  Please do not alter any information above this line
+''  it is generated dynamically by Highend3d.com and will
+''  be changed automatically on any updates.
+*/
+//////////////////////////////////////////////////////////////////////////////////////////////////////
+//find the location of the zenScripts folder
+//////////////////////////////////////////////////////////////////////////////////////////////////////
+
+global proc string[] zenScriptFolderLocationList( string $folderName, string $adjacentScript )
+{
+		rehash;
+
+	//find the correct separator for the OS
+	string 	$sep;
+
+		if(`about -os`=="nt" || `about -os`=="win64")
+			$sep=";";
+		else
+			$sep=":";
+
+	//look in the path for the procedure
+	string	$results[];
+	string 	$location;
+	string 	$path[]=stringToStringArray(`getenv MAYA_SCRIPT_PATH`,$sep);
+	int	$id=0;
+
+		for($p in $path)
+		{
+		    $location=searchPathArray(($folderName),{$p});
+
+		    if(size($location))
+			$results[$id++]=$location;
+		}
+
+	//search adjacent to this procedure
+	string	$verbose=`whatIs $adjacentScript`;
+	string	$verboseArray[]=`stringToStringArray $verbose ":"`;
+		$verboseArray=`stringArrayRemove {$verboseArray[0]} $verboseArray`;
+		$location=`stringArrayToString $verboseArray ":"`;
+		$location=`strip $location`;
+		$location=`dirname $location`+"/";
+
+	string	$folderInLocation[]=`getFileList -fld $location -fs $folderName`;
+
+		for($i=0;$i<size($folderInLocation);$i++)
+			$folderInLocation[$i]=$location+$folderInLocation[$i];
+
+		if(size($folderInLocation))
+			$results=`stringArrayCatenate $results $folderInLocation`;
+
+		$results=`stringArrayRemoveDuplicates $results`;
+
+	return	$results;
+}

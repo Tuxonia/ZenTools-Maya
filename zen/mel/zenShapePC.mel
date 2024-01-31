@@ -1,0 +1,56 @@
+/* This file downloaded from Highend3d.com
+''  
+''  Highend3d.com File Information:
+''  
+''    Script Name: ZenTools
+''    Author:  
+''    Last Updated: Mar 27, 2009
+''    Update/Change this file at:
+''    http://Highend3d.com/maya/downloads/mel_scripts/modeling/curve_tools/4337.html
+''  
+''  Please do not alter any information above this line
+''  it is generated dynamically by Highend3d.com and will
+''  be changed automatically on any updates.
+*/
+global proc string zenShapePC(string $shape, string $parent)
+{
+	string	$shape=zenReturnFirstStringItem(`ls -o $shape`);
+		if(size(`ls -tr $shape`)) $shape=zenReturnFirstStringItem(`listRelatives -s -ni $shape`);
+		
+		addAttr -m -at message -ln "zenParents" -sn "zp" $shape;
+		
+	string	$tr=zenReturnFirstStringItem(`listRelatives -p $shape`);
+	
+	string	$multMatrixNode=`createNode multMatrix`;
+			setAttr ($multMatrixNode+".caching") true;
+			connectAttr -f ($parent+".worldInverseMatrix") ($multMatrixNode+".i[0]");
+			connectAttr -f ($tr+".worldInverseMatrix") ($multMatrixNode+".i[1]");
+			
+	string	$clusterNodes[]=cluster($shape);                   
+	string	$fourByFourMatrix=`createNode fourByFourMatrix`;
+	float	$bindMatrix[]=getAttr($multMatrixNode+".o");
+	string	$attrs[]={"in00","in02","in02","in03","in10","in11","in12","in13","in20","in21","in22","in23","in30","in31","in32","in33"};
+	string	$weightNodes[];
+	string	$addDouble;
+	
+		for($i=0;$i<size($attrs);$i++)
+		{
+			$addDouble=`createNode addDoubleLinear`;
+			$weightNodes[$i]=`createNode blendWeighted`;
+			connectAttr ($addDouble+".o") ($weightNodes[$i]+".i["+zenFirstOpenPlug($weightNodes[$i]+".i")+"]");
+			setAttr ($addDouble+".i1") $bindMatrix[$i];
+			connectAttr -f ($weightNodes[$i]+".o") ($fourByFourMatrix+"."+$attrs[$i]);
+		}
+		
+		connectAttr -f ($fourByFourMatrix+".o") ($clusterNodes[0]+".bindPreMatrix");
+		connectAttr -f ($multMatrixNode+".o") ($clusterNodes[0]+".matrix");
+		connectAttr -f ($parent+".worldMatrix") ($multMatrixNode+".i[0]");
+			
+		$handleShape=zenReturnFirstStringItem(`listRelatives -s -ni $clusterNodes[1]`);
+		
+		disconnectAttr ($handleShape+".clusterTransforms[0]") (zenReturnFirstStringItem(listConnections("-plugs",true,$handleShape+".clusterTransforms[0]")));
+		
+		delete $clusterNodes[1];
+		
+	return	$clusterNodes[0];
+}

@@ -1,0 +1,58 @@
+/* This file downloaded from Highend3d.com
+''  
+''  Highend3d.com File Information:
+''  
+''    Script Name: ZenTools
+''    Author:  
+''    Last Updated: Mar 27, 2009
+''    Update/Change this file at:
+''    http://Highend3d.com/maya/downloads/mel_scripts/modeling/curve_tools/4337.html
+''  
+''  Please do not alter any information above this line
+''  it is generated dynamically by Highend3d.com and will
+''  be changed automatically on any updates.
+*/
+global proc int zenFirstOpenPlug(string $attr)
+{
+	string	$plugs[]=`ls ($attr+"[*]")`;
+	string	$connections[]=`listConnections $attr`;
+	int	$possibleUsed=size($plugs)+size($connections);
+	
+		if(!size($plugs))
+			return 0;
+				
+	string	$obj=zenReturnFirstStringItem(`ls -o $attr`);
+	
+	int	$endPlug=-1;
+	
+	int	$multiAttr=false;
+	
+	string	$tempStringArray[];
+	string	$tempStringArray2[];
+	
+	string	$p;
+
+		if(size(`listAttr $attr`)>1)
+			$multiAttr=true;
+
+		for($i=0;$endPlug<$possibleUsed && $endPlug<0;$i++)
+		{
+			$p=$attr+"["+(string($i))+"]";
+			if($multiAttr)
+			{
+				$tempStringArray=`listAttr $p`;
+				$tempStringArray2={};
+				
+				for($t in $tempStringArray)
+					$tempStringArray2[size($tempStringArray2)]=$obj+"."+$t;
+								
+				if(size(`listConnections -s 1 -d 1 $tempStringArray2`)==0)
+					$endPlug=zenCompID($p);
+			}
+			else
+			if(size(`listConnections -s 1 -d 1 $p`)==0)
+				$endPlug=zenCompID($p);
+		}
+	
+	return $endPlug;
+}

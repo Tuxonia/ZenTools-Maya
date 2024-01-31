@@ -1,0 +1,508 @@
+/* This file downloaded from Highend3d.com
+''  
+''  Highend3d.com File Information:
+''  
+''    Script Name: ZenTools
+''    Author:  
+''    Last Updated: Mar 27, 2009
+''    Update/Change this file at:
+''    http://Highend3d.com/maya/downloads/mel_scripts/modeling/curve_tools/4337.html
+''  
+''  Please do not alter any information above this line
+''  it is generated dynamically by Highend3d.com and will
+''  be changed automatically on any updates.
+*/
+//adds auto-flex capabilities to a muscle
+global proc int rigZenMuscleAddAutoFlex(string $sel,int $axis)
+{	
+		if(!`objExists $sel`)
+			error -sl 1 ("The input selection: \""+$sel+"\" does not exist.");
+	
+	int	$err;
+	
+	string	$handle;
+	string	$muscleShape;
+	string	$destinations[];
+
+	string	$tempStringArray[];
+	
+		//if we have the handle, find the muscle ( & vice-versa )
+		if(objExists($sel+".zenMuscle"))
+		{
+			$handle=$sel;
+			$muscleShape=zenReturnFirstStringItem(`listConnections -sh 1 -s 1 -d 0 ($handle+".zenMuscle")`);
+		}
+		else
+		{
+			if(nodeType($sel)=="nurbsSurface")
+				$tempStringArray[0]=$sel;
+			else
+			if(nodeType($sel)=="transform")
+				$tempStringArray=ls("-type","nurbsSurface",`listRelatives -c -s -ni $sel`);
+			
+			for($s in $tempStringArray)
+			{
+				$destinations=`listConnections -sh 1 -p 1 -scn 1 -s 0 -d 1 ($s+".message")`;
+				for($d in $destinations)
+				{
+					if( zenReturnLastStringItem(stringToStringArray($d,"."))=="zenMuscle" )
+					{
+						$handle=zenReturnFirstStringItem(stringToStringArray($d,"."));
+						$muscleShape=$s;
+					}
+				}
+			}
+		}
+		
+		if(!size($muscleShape))
+		{
+			error 
+				-sl 1 
+				(
+					"ZenTools can only generate auto-flex capabilites for "+
+					"muscles created using ZenTools \"Create Muscle/Tendon...\","+
+					"the mel command \"rigZenMuscle\", or generated using the "+
+					"\"muscle.create()\" method in the python module \"zen\"."
+				);
+		}
+	
+	float	$autoTransXVal=`getAttr($handle+".tx")`;          
+	float	$autoTransYVal=`getAttr($handle+".ty")`;
+	float	$autoTransZVal=`getAttr($handle+".tz")`;
+	float	$autoRotXVal=`getAttr($handle+".rx")`;
+	float	$autoRotYVal=`getAttr($handle+".ry")`;
+	float	$autoRotZVal=`getAttr($handle+".rz")`;
+	float	$autoScaleXVal=`getAttr($handle+".sx")`;
+	float	$autoScaleYVal=`getAttr($handle+".sy")`;
+	float	$autoScaleZVal=`getAttr($handle+".sz")`;
+	float	$autoUPosVal=`getAttr($handle+".uPos")`;
+	float	$autoFalloffVal=`getAttr($handle+".fallOff")`;
+		
+	string	$muscleTr=zenReturnFirstStringItem(`listRelatives -p $muscleShape`);
+	
+	int	$nextPlug;
+	
+		if(objExists($handle+".zenAutoFlex"))
+			$nextPlug=`zenFirstOpenPlug ($handle+".zenAutoFlex")`;
+		else
+			error -sl 1 ("The input selection: \""+$sel+"\" is not part of a muscle setup created with zenTools.");
+		
+		//from the muscle, we can find the bind pose & the root joint
+		
+	string	$bindPose=zenReturnFirstStringItem(`dagPose -q -bp $muscleTr`);
+	
+		if( !( size($bindPose) ) )
+			error -sl 1 "This procedure requires a bind pose be present on the skeleton.";
+		if( !(size(`dagPose -q -ap $bindPose`)) )
+			error -sl 1 "You must first set a pose that is different from the bind pose to use auto-flex.";
+		
+	string	$poseMembers[]=ls("-l",`dagPose -q -m $bindPose`);
+	
+	string	$root=zenReturnFirstStringItem($poseMembers);    
+	
+	string	$currentPose=`dagPose -s $root`;
+		
+	
+	string	$oppositeHandle=zenReturnFirstStringItem(`listConnections -sh 1 -s 1 -d 0 ($handle+".zenOpposite")`);
+	string	$oppositeMuscleShape;
+	string	$oppositeMuscleTr;
+
+	string	$flippedPose;
+	
+	float	$parentRP[];
+	float	$oppositeParentRP[];
+	float	$parentCenter[];
+	float	$oppositeParentCenter[];
+	
+	float	$difference;
+	float	$greatestDifference=0;
+	
+	string	$parent;
+	string	$oppositeParent; 
+	
+	string	$bindPoseNode=zenReturnFirstStringItem(`dagPose -q -bp $root`);
+		if(!objExists($bindPoseNode))
+			error -sl true "This procedure requires a bind pose.";
+	int $sucess=rigZenGoToPose($bindPoseNode);
+		if(!$sucess) error -sl true "Could not achieve pose.";
+	
+	string	$autoFlexTr=zenReturnFirstStringItem(`listRelatives -p $handle`);
+	
+	string	$poseDriver;
+	string	$poseMultiplier;
+	string	$poseBlender;
+
+	string	$autoFlexBias=$handle+".zenAutoFlex["+(string($nextPlug))+"].autoFlexBias";
+	
+	string	$autoTransX=$handle+".zenAutoFlex["+(string($nextPlug))+"].autoTransX";
+			setAttr ($handle+".tx") 0;
+			
+	string	$autoTransY=$handle+".zenAutoFlex["+(string($nextPlug))+"].autoTransY";
+			setAttr ($handle+".ty") 0;
+
+	string	$autoTransZ=$handle+".zenAutoFlex["+(string($nextPlug))+"].autoTransZ";
+			setAttr ($handle+".tz") 0;
+
+	string	$autoRotX=$handle+".zenAutoFlex["+(string($nextPlug))+"].autoRotX";
+			setAttr $autoRotX `getAttr($handle+".rx")`;
+	
+	string	$autoRotY=$handle+".zenAutoFlex["+(string($nextPlug))+"].autoRotY";
+			setAttr ($handle+".ry") 0;
+			
+	string	$autoRotZ=$handle+".zenAutoFlex["+(string($nextPlug))+"].autoRotZ";
+			setAttr ($handle+".rz") 0;
+			
+	string	$autoScaleX=$handle+".zenAutoFlex["+(string($nextPlug))+"].autoScaleX";
+			setAttr ($handle+".sx") 1;
+			
+	string	$autoScaleY=$handle+".zenAutoFlex["+(string($nextPlug))+"].autoScaleY";
+			setAttr ($handle+".sy") 1;
+	
+	string	$autoScaleZ=$handle+".zenAutoFlex["+(string($nextPlug))+"].autoScaleZ";
+			setAttr ($handle+".sz") 1;
+			
+	string	$autoUPos=$handle+".zenAutoFlex["+(string($nextPlug))+"].autoUPos";
+			//setAttr ($handle+".uPos") .5;
+			
+	string	$autoFallOff=$handle+".zenAutoFlex["+(string($nextPlug))+"].autoFallOff";
+			//setAttr ($handle+".uPos") .8;
+	
+	string	$poseDepth=$handle+".zenAutoFlex["+(string($nextPlug))+"].poseDepth";
+	
+	string	$zenPoseAttr=$handle+".zenAutoFlex["+(string($nextPlug))+"].zenPoseAttr";
+	string	$zenAttrVal=$handle+".zenAutoFlex["+(string($nextPlug))+"].zenAttrVal";
+	
+		addAttr -ln ("autoFlex"+string($nextPlug)) -at "enum" -en "---:---" $handle;
+		setAttr -k 0 -cb 1 -l 1 ($handle+".autoFlex"+string($nextPlug));
+	
+	/*	
+		$aliasAttrs=stringArrayRemove
+		(
+			{"zenAutoFlex["+(string($nextPlug))+"]"},
+			listAttr($handle+".zenAutoFlex["+(string($nextPlug))+"]")
+		);
+	*/
+	
+	string	$tempString;
+	string	$x;
+
+	
+	string	$connectedAttr;
+	string	$addDoubleLinear;
+	string	$multDoubleLinear;
+	string	$multDoubleLinear2;
+	string	$connectTo[];
+	string	$blendTwo;
+	string	$clamp;
+	
+		//pose driver
+		
+	string	$poseDriverReturn[];
+		$poseDriverReturn=rigZenPoseDrivenWeight($bindPose,$currentPose);
+		
+	string	$poseDriver=$poseDriverReturn[0];
+		
+	string	$infAttrs[];
+			
+		connectAttr -f $poseDriver $poseDepth;
+
+		connectAttr -f $autoFlexBias (zenReturnFirstStringItem( `ls -o $poseDriver` )+".bias");
+		
+		//u position
+		$connectTo={};
+		$connectedAttr=$handle+".uPos";	
+		
+		$tempStringArray=`listConnections -p true -s false -d true $connectedAttr`;
+		for($s in $tempStringArray)
+		{
+			if(size(`ls -o -type transform $s`)==0)
+				$connectTo[size($connectTo)]=$s;
+		}
+/*
+		$multDoubleLinear=`createNode multDoubleLinear`;
+			connectAttr $autoUPos ($multDoubleLinear+".i1");
+			setAttr ($multDoubleLinear+".i2") 2;
+			
+		$multDoubleLinear2=`createNode multDoubleLinear`;
+			connectAttr $connectedAttr ($multDoubleLinear2+".i1");
+			connectAttr ($multDoubleLinear+".o") ($multDoubleLinear2+".i2");
+			
+		$blendTwo=`createNode blendTwoAttr`;
+			connectAttr $connectedAttr ($blendTwo+".input[0]");
+			connectAttr ($multDoubleLinear2+".o") ($blendTwo+".input[1]");
+			connectAttr $poseDriver ($blendTwo+".ab");
+*/
+		$blendTwo=`createNode blendTwoAttr`;
+			connectAttr $connectedAttr ($blendTwo+".i[0]");
+			connectAttr $autoUPos ($blendTwo+".i[1]");
+			connectAttr $poseDriver ($blendTwo+".ab");
+			
+		$clamp=`createNode clamp`;
+			setAttr ($clamp+".minR") .1;
+			setAttr ($clamp+".maxR") .9;
+			
+		connectAttr -f ($blendTwo+".o") ($clamp+".ipr");
+		
+		for($c in $connectTo)
+			connectAttr -f ($clamp+".opr") $c;
+		
+		//fallOff
+		$connectedAttr=$handle+".fallOff";
+		
+		$connectTo={};
+		
+		$tempStringArray=`listConnections -p true -s false -d true $connectedAttr`;
+		for($s in $tempStringArray)
+		{
+			if(size(`ls -o -type transform $s`)==0)
+				$connectTo[size($connectTo)]=$s;
+		}
+		
+		$blendTwo=`createNode blendTwoAttr`;
+			connectAttr $connectedAttr ($blendTwo+".i[0]");
+			connectAttr $autoFallOff ($blendTwo+".i[1]");
+			connectAttr $poseDriver ($blendTwo+".ab");
+			
+		$clamp=`createNode clamp`;
+			setAttr ($clamp+".minR") .1;
+			setAttr ($clamp+".maxR") .9;
+			
+		connectAttr -f ($blendTwo+".o") ($clamp+".ipr");
+		
+		for($c in $connectTo)
+			connectAttr -f ($clamp+".opr") $c;
+		
+		//translate
+		
+		$poseMultiplier=`createNode multDoubleLinear`;
+			
+			connectAttr $poseDriver ($poseMultiplier+".i1");
+		
+			connectAttr $autoTransX ($poseMultiplier+".i2");
+			
+			//check to see if there is already a pose connected
+			$connectedAttr=zenReturnFirstStringItem(`listConnections -p 1 -scn 1 -s 1 -d 0 ($autoFlexTr+".tx")`);
+			if(size($connectedAttr))
+			{
+				$addDoubleLinear=`createNode addDoubleLinear`;
+				connectAttr $connectedAttr ($addDoubleLinear+".i1");
+				connectAttr ($poseMultiplier+".o") ($addDoubleLinear+".i2");
+				connectAttr -f ($addDoubleLinear+".o") ($autoFlexTr+".tx");
+			}
+			else				
+				connectAttr ($poseMultiplier+".o") ($autoFlexTr+".tx");
+			
+		$poseMultiplier=`createNode multDoubleLinear`;	
+			
+			connectAttr $poseDriver ($poseMultiplier+".i1");
+		
+			connectAttr $autoTransY ($poseMultiplier+".i2");
+
+			$connectedAttr=zenReturnFirstStringItem(`listConnections -p 1 -scn 1 -s 1 -d 0 ($autoFlexTr+".ty")`);
+			if(size($connectedAttr))
+			{
+				$addDoubleLinear=`createNode addDoubleLinear`;
+				connectAttr $connectedAttr ($addDoubleLinear+".i1");
+				connectAttr ($poseMultiplier+".o") ($addDoubleLinear+".i2");
+				connectAttr -f ($addDoubleLinear+".o") ($autoFlexTr+".ty");
+			}
+			else	
+				connectAttr ($poseMultiplier+".o") ($autoFlexTr+".ty");
+			
+		$poseMultiplier=`createNode multDoubleLinear`;
+			
+			connectAttr $poseDriver ($poseMultiplier+".i1");
+		
+			connectAttr $autoTransZ ($poseMultiplier+".i2");
+
+			$connectedAttr=zenReturnFirstStringItem(`listConnections -p 1 -scn 1 -s 1 -d 0 ($autoFlexTr+".tz")`);
+			if(size($connectedAttr))
+			{
+				$addDoubleLinear=`createNode addDoubleLinear`;
+				connectAttr $connectedAttr ($addDoubleLinear+".i1");
+				connectAttr ($poseMultiplier+".o") ($addDoubleLinear+".i2");
+				connectAttr -f ($addDoubleLinear+".o") ($autoFlexTr+".tz");
+			}
+			else	
+				connectAttr ($poseMultiplier+".o") ($autoFlexTr+".tz");
+		
+		//rotate
+			
+		$poseMultiplier=`createNode multDoubleLinear`;		
+			
+			connectAttr $poseDriver ($poseMultiplier+".i1");
+		
+			connectAttr $autoRotX ($poseMultiplier+".i2");
+			
+			$connectedAttr=zenReturnFirstStringItem(`listConnections -p 1 -scn 1 -s 1 -d 0 ($autoFlexTr+".rx")`);
+			if(size($connectedAttr))
+			{
+				$addDoubleLinear=`createNode addDoubleLinear`;
+				connectAttr $connectedAttr ($addDoubleLinear+".i1");
+				connectAttr ($poseMultiplier+".o") ($addDoubleLinear+".i2");
+				connectAttr -f ($addDoubleLinear+".o") ($autoFlexTr+".rx");
+			}
+			else	
+				connectAttr ($poseMultiplier+".o") ($autoFlexTr+".rx");
+			
+		$poseMultiplier=`createNode multDoubleLinear`;		
+			
+			connectAttr $poseDriver ($poseMultiplier+".i1");
+		
+			connectAttr $autoRotY ($poseMultiplier+".i2");
+
+			$connectedAttr=zenReturnFirstStringItem(`listConnections -p 1 -scn 1 -s 1 -d 0 ($autoFlexTr+".ry")`);
+			if(size($connectedAttr))
+			{
+				$addDoubleLinear=`createNode addDoubleLinear`;
+				connectAttr $connectedAttr ($addDoubleLinear+".i1");
+				connectAttr ($poseMultiplier+".o") ($addDoubleLinear+".i2");
+				connectAttr -f ($addDoubleLinear+".o") ($autoFlexTr+".ry");
+			}
+			else	
+				connectAttr ($poseMultiplier+".o") ($autoFlexTr+".ry");
+			
+		$poseMultiplier=`createNode multDoubleLinear`;
+			
+			connectAttr $poseDriver ($poseMultiplier+".i1");
+		
+			connectAttr $autoRotZ ($poseMultiplier+".i2");
+			
+			$connectedAttr=zenReturnFirstStringItem(`listConnections -p 1 -scn 1 -s 1 -d 0 ($autoFlexTr+".rz")`);
+			if(size($connectedAttr))
+			{
+				$addDoubleLinear=`createNode addDoubleLinear`;
+				connectAttr $connectedAttr ($addDoubleLinear+".i1");
+				connectAttr ($poseMultiplier+".o") ($addDoubleLinear+".i2");
+				connectAttr -f ($addDoubleLinear+".o") ($autoFlexTr+".rz");
+			}
+			else	
+				connectAttr ($poseMultiplier+".o") ($autoFlexTr+".rz");
+			
+		//scale
+		
+		$poseBlender=`createNode blendColors`;
+		
+			setAttr ($poseBlender+".c2") 1 1 1;
+			
+			connectAttr $poseDriver ($poseBlender+".b");
+		
+			connectAttr $autoScaleX ($poseBlender+".c1r");
+			
+			$connectedAttr=zenReturnFirstStringItem(`listConnections -p 1 -scn 1 -s 1 -d 0 ($autoFlexTr+".sx")`);
+			if(size($connectedAttr))
+			{
+				$multDoubleLinear=`createNode multDoubleLinear`;
+				connectAttr $connectedAttr ($multDoubleLinear+".i1");
+				connectAttr ($poseBlender+".opr") ($multDoubleLinear+".i2");
+				connectAttr -f ($multDoubleLinear+".o") ($autoFlexTr+".sx");
+			}
+			else	
+				connectAttr ($poseBlender+".opr") ($autoFlexTr+".sx");
+						
+			connectAttr $autoScaleY ($poseBlender+".c1g");
+			
+			$connectedAttr=zenReturnFirstStringItem(`listConnections -p 1 -scn 1 -s 1 -d 0 ($autoFlexTr+".sy")`);
+			if(size($connectedAttr))
+			{
+				$multDoubleLinear=`createNode multDoubleLinear`;
+				connectAttr $connectedAttr ($multDoubleLinear+".i1");
+				connectAttr ($poseBlender+".opg") ($multDoubleLinear+".i2");
+				connectAttr -f ($multDoubleLinear+".o") ($autoFlexTr+".sy");
+			}
+			else
+				connectAttr ($poseBlender+".opg") ($autoFlexTr+".sy");
+						
+			connectAttr $autoScaleZ ($poseBlender+".c1b");
+			
+			$connectedAttr=zenReturnFirstStringItem(`listConnections -p 1 -scn 1 -s 1 -d 0 ($autoFlexTr+".sz")`);
+			if(size($connectedAttr))
+			{
+				$multDoubleLinear=`createNode multDoubleLinear`;
+				connectAttr $connectedAttr ($multDoubleLinear+".i1");
+				connectAttr ($poseBlender+".opb") ($multDoubleLinear+".i2");
+				connectAttr -f ($multDoubleLinear+".o") ($autoFlexTr+".sz");
+			}
+			else
+				connectAttr ($poseBlender+".opb") ($autoFlexTr+".sz");	
+			
+	string	$sharedAttributes[];
+	string	$tempStringArray2[];
+	string	$oppositeAttr;
+	int	$sucess;		
+		if( size($oppositeHandle) && $axis )
+		{		
+			$sucess=rigZenGoToPose($currentPose);
+			if($err) error("-sl",1,"Failed to achieve pose.");
+			
+			rigZenFlipPose($axis,$bindPose);
+			rigZenMuscleAddAutoFlex($oppositeHandle,false);
+						
+			$sharedAttributes=stringArrayRemove
+			(
+				{"zenAutoFlex["+(string($nextPlug))+"]"},
+				listAttr($handle+".zenAutoFlex["+(string($nextPlug))+"]")
+			);
+						
+			for($s in $sharedAttributes)
+				if(objExists($oppositeHandle+"."+$s) && objExists($handle+"."+$s))
+					connectAttr -f ($handle+"."+$s) ($oppositeHandle+"."+$s);
+		}
+		
+		$sucess=rigZenGoToPose($currentPose);
+		if($err) error("-sl",1,"Failed to achieve pose.");
+		
+		for($i=1;$i<size($poseDriverReturn);$i++)
+		{
+			if(size(dagPose("-q","-bp",`ls -o $poseDriverReturn[$i]`)))
+			{
+				$infAttrs[size($infAttrs)]=$poseDriverReturn[$i];
+			}
+		}	
+		
+		for($i=0;$i<size($infAttrs);$i++)
+		{
+			connectAttr ($infAttrs[$i]) ($zenPoseAttr+"["+(string($i))+"]");
+			setAttr ($zenAttrVal+"["+(string($i))+"]") (`getAttr $infAttrs[$i]`);
+		}
+		
+		setAttr $autoTransX $autoTransXVal;
+		setAttr $autoTransY $autoTransYVal;
+		setAttr $autoTransZ $autoTransZVal;
+		setAttr $autoRotX $autoRotXVal;
+		setAttr $autoRotY $autoRotYVal;
+		setAttr $autoRotZ $autoRotZVal;
+		setAttr $autoScaleX $autoScaleXVal;
+		setAttr $autoScaleY $autoScaleYVal;
+		setAttr $autoScaleZ $autoScaleZVal;
+		setAttr	$autoUPos $autoUPosVal;
+		setAttr	$autoFallOff $autoFalloffVal;
+		
+	string	$aliasAttrs[]=
+		{
+			$poseDepth,$autoFlexBias,$autoUPos,$autoFallOff,
+			$autoTransX,$autoTransY,$autoTransZ,
+			$autoRotX,$autoRotY,$autoRotZ,
+			$autoScaleX,$autoScaleY,$autoScaleZ
+		};
+		
+	string	$leafName;
+			
+		for($i=0;$i<size($aliasAttrs);$i++)
+		{
+			$leafName=zenReturnLastStringItem(stringToStringArray($aliasAttrs[$i],"."));
+			$tempString=($leafName+(string($nextPlug)));
+			addAttr -k 1 -ln $tempString -nn (interToUI($leafName)) -at (getAttr("-type",$aliasAttrs[$i])) $handle;
+			setAttr ($handle+"."+$tempString) (getAttr($aliasAttrs[$i]));
+			if(size(`listConnections -s 1 -d 0 $aliasAttrs[$i]`))
+				connectAttr -f $aliasAttrs[$i] ($handle+"."+$tempString);
+			else
+				connectAttr -f ($handle+"."+$tempString) $aliasAttrs[$i];
+			//catchQuiet(`aliasAttr $tempString ($handle+"."+$x)`);
+		}
+		
+		select $sel;
+		delete $currentPose;
+		
+	return	$nextPlug;
+}

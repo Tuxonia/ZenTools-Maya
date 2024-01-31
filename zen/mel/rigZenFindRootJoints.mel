@@ -1,0 +1,47 @@
+/* This file downloaded from Highend3d.com
+''  
+''  Highend3d.com File Information:
+''  
+''    Script Name: ZenTools
+''    Author:  
+''    Last Updated: Mar 27, 2009
+''    Update/Change this file at:
+''    http://Highend3d.com/maya/downloads/mel_scripts/modeling/curve_tools/4337.html
+''  
+''  Please do not alter any information above this line
+''  it is generated dynamically by Highend3d.com and will
+''  be changed automatically on any updates.
+*/
+global proc string[] rigZenFindRootJoints(string $influences[])
+{
+	string	$topLevelTrs[]=zenReturnTopLevelTransforms($influences);
+	
+	int	$found=false;
+	string	$nextRelatives[];
+	
+	string	$rootJoints[];
+
+		for($t in $topLevelTrs)
+		{
+			$found=false;
+			$nextRelatives={};
+			$nextRelatives[0]=$t;
+
+			while($found==false)
+			{
+				for($n in $nextRelatives)
+				{                                   
+					if(`nodeType $n`=="joint")
+					{
+						$rootJoints[size($rootJoints)]=$n;
+						$found=true;
+					}
+				}
+				
+				if(!$found)
+					$nextRelatives=`listRelatives -f -c -type transform $nextRelatives`;
+			}
+		}
+		
+	return	$rootJoints;
+}

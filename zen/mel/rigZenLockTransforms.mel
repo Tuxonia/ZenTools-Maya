@@ -1,0 +1,32 @@
+/* This file downloaded from Highend3d.com
+''  
+''  Highend3d.com File Information:
+''  
+''    Script Name: ZenTools
+''    Author:  
+''    Last Updated: Mar 27, 2009
+''    Update/Change this file at:
+''    http://Highend3d.com/maya/downloads/mel_scripts/modeling/curve_tools/4337.html
+''  
+''  Please do not alter any information above this line
+''  it is generated dynamically by Highend3d.com and will
+''  be changed automatically on any updates.
+*/
+global proc rigZenLockTransforms(string $nodes[])
+{
+	string	$attrs[];
+		for($node in $nodes)
+		{
+			if(objExists($node))
+			{
+				$attrs=zenStringArrayIntersect
+				(
+					`listAttr -m -u -se -sn $node`,
+					{"tx","ty","tz","rx","ry","rz","sx","sy","sz"}
+				);				
+				
+				for($a in $attrs)
+					setAttr -lock true -keyable false -cb true ($node+"."+$a);
+			}
+		}
+}

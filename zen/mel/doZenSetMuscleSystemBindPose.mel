@@ -1,0 +1,42 @@
+/* This file downloaded from Highend3d.com
+''  
+''  Highend3d.com File Information:
+''  
+''    Script Name: ZenTools
+''    Author:  
+''    Last Updated: Mar 27, 2009
+''    Update/Change this file at:
+''    http://Highend3d.com/maya/downloads/mel_scripts/modeling/curve_tools/4337.html
+''  
+''  Please do not alter any information above this line
+''  it is generated dynamically by Highend3d.com and will
+''  be changed automatically on any updates.
+*/
+global proc string[] doZenSetMuscleSystemBindPose()
+{
+	string	$bindPoseNodes[];	
+
+	string	$sel[]=`ls -sl`;
+	
+	string	$cMuscleSystems[];
+	
+		if(`pluginInfo -q -l MayaMuscle`)
+			$cMuscleSystems=ls("-type","cMuscleSystem",listHistory("-future",true,ls("-sl")));
+		
+	string	$influences[];
+	
+		for($m in $cMuscleSystems)
+			$influences=stringArrayCatenate($influences,`listConnections -sh 1 -s 1 -d 0 ($m+".muscleData")`);
+		
+	string	$rootJoints[]=rigZenFindRootJoints($influences);
+		
+		for($r in $rootJoints)
+		{
+			if(size(`dagPose -q -bp $r`))
+				$bindPoseNodes=stringArrayCatenate($bindPoseNodes,`dagPose -q -bp $r`);
+			else
+				$bindPoseNodes[size($bindPoseNodes)]=`dagPose -bp -save $r`;
+		}
+		
+	return	$bindPoseNodes;
+}

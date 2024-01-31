@@ -1,0 +1,29 @@
+/* This file downloaded from Highend3d.com
+''  
+''  Highend3d.com File Information:
+''  
+''    Script Name: ZenTools
+''    Author:  
+''    Last Updated: Mar 27, 2009
+''    Update/Change this file at:
+''    http://Highend3d.com/maya/downloads/mel_scripts/modeling/curve_tools/4337.html
+''  
+''  Please do not alter any information above this line
+''  it is generated dynamically by Highend3d.com and will
+''  be changed automatically on any updates.
+*/
+//return an array which is comprised of the portion
+//beginning at $start and ending at $end
+global proc int[] zenIntArraySector(int $array[], int $start,int $end)
+{
+	int 	$n=0;
+	int 	$newArray[];
+
+		for($i=$start;$i<=$end;$i++)
+		{
+			$newArray[$n]=$array[$i];
+			$n++;
+		}
+
+	return 	$newArray;
+}

@@ -1,0 +1,32 @@
+- Original script: https://www.highend3d.com/maya/script/zentools-for-maya
+
+- Bonus Tool - https://apps.autodesk.com/en/Detail/Index?id=8115150172702393827&os=Win64&appLang=en
+---------------------------------------------------------------------------------------------------------
+Here are a few steps to run this script: 
+1. Install Autodesk Maya Bonus.
+2. Copy the "Zen" folder to the Maya scripts folder
+(Linux) $HOME/maya/<version>.
+(Mac OS X) $HOME/Library/Preferences/Autodesk/maya/<version>.
+(Windows)\Users<username>\Documents\maya<version>.
+3. Launch Maya, now in the main menu select (Windows > Settings/Preferences/Plug-in Manager) and enable 
+-matrixNodes.mll
+-pointOnMeshinfo.mll
+-closestPointOnCurve.mll (This plugin may be missing)
+4. In the script editor, specify this command and run the script. MEL
+python("import zen");
+evalDeferred("zenTools");
+---------------------------------------------------------------------------------------------------------
+Solving the tasks.
+	Problem 1. 
+# Error: line 1: Exception: file C:/Users/username/OneDrive/Documents/maya/version/scripts\zen\__init__.py line 30: ZenTools requires the pointOnMeshInfo plugin to be installed.
+
+Solution. 
+Open the file "__init__.py" using Notepad, delete line 30 (call Exception("ZenTools requires the plugin "+plugin+".") ), write the word "pass" without quotes (basically replacing line 30 with the word "pass"), save the file and launch Maya.
+
+	Problem 2.
+Possible problems with Python.
+
+Solution.
+Install Python and PyMEL. (There are difficulties with installing PyMEL in version 2024)
+---------------------------------------------------------------------------------------------------------
+In the folder "zen>mel>help" there is ZenTools documentation
